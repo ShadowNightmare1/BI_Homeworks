@@ -1,3 +1,6 @@
+# Mauricio Abarca J.
+# 19.319.550-4
+
 import train
 import test
 
