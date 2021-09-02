@@ -16,6 +16,8 @@ def train_snn(X, y, param):
     w1,w2 = ut.iniW(hidden_nodes, n_features, ut.OUTPUT_NODES)
     cost = []
 
+    epoch = 0
+    r2_best = 1000
     
     for iter in range(param[1]):
         # Forward Pass
@@ -31,10 +33,15 @@ def train_snn(X, y, param):
         
         # Epoch Log
         r2 = ut.r2(a2, y_train)
-        if iter % 10 == 0:
+
+        # if 0 < r2 < 1:
+        #     r2_best = r2
+        #     epoch = iter
+
+        if iter % 50 == 0:
             print('Epoch: {} | R2: {}'.format(iter, r2))
 
-    
+    # print('best: {} | epoch {}'.format(r2_best, epoch))
     return (w1, w2, cost)
 
 # Beginning ...
