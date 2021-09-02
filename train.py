@@ -1,74 +1,51 @@
 # Mauricio Abarca J.
 # 19.319.550-4
 
-from utilities import *
+import utilities as ut
 
 
-def main():
+# Training of SNN
 
-    # Load Training Data 
-    X, y = loadData(TRAIN_FILE)
-    n_samples, n_caract = X.shape
+def train_snn(X, y, param):
+    _, n_features = X.shape
+    hidden_nodes = param[0]
+    lr = param[2]
     X_train = X.T
     y_train = y.T
 
-    
-    # Create First Hidden Layer
-    dense1 = DenseLayer(hidden_nodes, n_caract)
-    activation1 = ActivationLayer()
-
-    # Create Output Layer
-    dense2 = DenseLayer(output_nodes, hidden_nodes)
-    activation2 = ActivationLayer()
-
-    # Create Metrics object for the model
-    metrics = Metrics()
-
-    # Start the training epochs
-    for i in range(iterations):
-
-        # Forward Pass Hidden Layer
-        dense1.forward(X_train) 
-        activation1.sigmoid(dense1.output) # => A1
-
-        # Forward Pass Output Layer
-        dense2.forward(activation1.output)
-        activation2.sigmoid(dense2.output) # => A2
-
-        # Calculate metrics
-        metrics.metrics(y_train, activation2.output, i)
-
-        # Backward Pass Output Layer
-        dE2 = metrics.error
-        dense2.backward(dE2, activation2.sigmoidPrime, activation1.output)
+    w1,w2 = ut.iniW(hidden_nodes, n_features, ut.OUTPUT_NODES)
+    cost = []
 
     
-        # Backward Pass Hidden Layer
-        # dE1 = np.dot(dense2.weights.T, dense2.dZ)
-        dE1 = dense2.weights.T @ dense2.dZ
-        dense1.backward(dE1, activation1.sigmoidPrime, X_train)
+    for iter in range(param[1]):
+        # Forward Pass
+        a1, a2 = ut.forward(X_train, w1, w2)
 
-        if (i % 10 == 0):
-            print("Epoch: {} | MAE: {:.12f}".format(i + 1, metrics.mae))
+        # Calculate Cost
+        error = a2 - y_train
+        mse = ut.mse(error)
+        cost.append(mse)
+
+        # Backward Pass
+        w1, w2 = ut.grad_bp(a1, a2, X_train, error, w1, w2, lr)
         
+        # Epoch Log
+        r2 = ut.r2(a2, y_train)
+        if iter % 10 == 0:
+            print('Epoch: {} | R2: {}'.format(iter, r2))
+
     
+    return (w1, w2, cost)
 
-    # Export the Loss of the training cycle
-    metrics.exportLoss()
-    dense1.saveWeights(1)
-    dense2.saveWeights(2)
+# Beginning ...
 
-    pd.DataFrame(data=[dense1.weights, dense2.weights]).to_csv('weights.csv', header=None, index=None)
-    # export weights 1 and 2.
-   
+def main():
+    par_snn = ut.load_config('config.csv')
+    xe, ye = ut.load_data('train.csv')
+    w1, w2, cost = train_snn(xe, ye, par_snn)
+    ut.save_w(w1, w2, 'w_snn.npz', cost, 'costo.csv')
+    # pd.DataFrame(data=w1).to_csv('peso1.csv', header=None, index=None)    
+    # pd.DataFrame(data=w2).to_csv('peso2.csv', header=None, index=None)    
 
 if __name__ == '__main__':
     main()
-    # x = np.array([[1, 2], 
-    #               [3, 4]])
-# 
-    # y = np.array([[1, 2], 
-    #               [3, 4]])
-# 
-    # print(np.multiply(x, y))
-    # print(x.dot(y))

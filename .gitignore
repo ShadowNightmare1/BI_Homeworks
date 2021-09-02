@@ -1,4 +1,3 @@
 data/
-w_snn.npz
-costo.csv
-metrica.csv
+train.csv
+test.csv
