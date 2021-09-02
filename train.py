@@ -57,6 +57,8 @@ def main():
     metrics.exportLoss()
     dense1.saveWeights(1)
     dense2.saveWeights(2)
+
+    pd.DataFrame(data=[dense1.weights, dense2.weights]).to_csv('weights.csv', header=None, index=None)
     # export weights 1 and 2.
    
 

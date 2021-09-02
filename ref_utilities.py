@@ -7,27 +7,48 @@ import numpy as np
 
 # Hyperparameters and constants
 METRICS_FILE = 'metrica.csv'
+OUTPUT_NODES = 1
 
 # Init.weights of the DL
-def iniW(...):
-    # Init. w1 & w2
-    # Complete code
+def iniW(hidden_nodes, input_nodes, output_nodes):
+    w1 = np.random.randn(hidden_nodes, input_nodes)
+    w2 = np.random.randn(output_nodes, hidden_nodes)
     return (w1, w2)
 
 # STEP 1: Feed-forward of DAE
 def forward(x, w1, w2):
-    #complete code
-    return
+
+    # Hidden Layer
+    z1 = w1.dot(x)
+    a1 = act_sigmoid(z1)
+
+    # Output Layer
+    z2 = w2.dot(a1)
+    a2 = act_sigmoid(z2)
+
+    return a1, a2
 
 # STEP 2: Gradient via BackPropagation
-def grad_bp(...):
-    #complete code
-    return
+def grad_bp(a1, a2, x, error, w1, w2, lr):
+
+    # Backward Pass Output
+    deriv2 = deriva_sigmoid(a2)
+    dZ2 = np.multiply(error, deriv2)
+    dW2 = dZ2.dot(a1.T)
+
+    # Backward Pass Hidden
+    deriv1 = deriva_sigmoid(a1)
+    dZ1 = np.multiply(w2.T.dot(dZ2), deriv1)
+    dW1 = dZ1.dot(x.T)
+
+    W1, W2 = updW(w1, dW1, w2, dW2, lr)
+    return W1, W2
 
 # Update SNN's Weight
-def updW(...):
-    #complete code
-    return
+def updW(w1, dW1, w2, dW2, lr):
+    W1 = w1 - (lr * dW1)
+    W2 = w2 - (lr * dW2)
+    return W1, W2
 
 # Activation Function
 def act_sigmoid(z):
@@ -49,9 +70,17 @@ def metrica(y_real, y_pred):
     mse = np.power(error, 2).mean()
     rmse = np.sqrt(mse)
     mae = np.abs(error).mean()
+    print(np.var(error) / np.var(y_real))
     r2 = 1 - (np.var(error) / np.var(y_real))    
     saveMetric(mae, rmse, r2)
     return 
+
+def r2(y_real, y_pred):
+    r2 = 1 - (np.var(y_pred - y_real) / np.var(y_real))
+    return r2
+
+def mse(error):
+    return np.power(error, 2).mean()
 
 #------------------------------------------------------------------------
 #      LOAD-SAVE
@@ -71,7 +100,7 @@ def load_config(fname):
     hidden_nodes = int(config[0][0])
     iterations = int(config[0][1])
     lr = config[0][2]
-    return list(hidden_nodes, iterations, lr)
+    return hidden_nodes, iterations, lr
 
 
 # Normalize Function
@@ -101,12 +130,17 @@ def load_data(fname):
     return X, y
 
 #save weights of SNN in numpy format
-def save_w(...):    
-    #completar code    
+def save_w(w1, w2, weight_fname, cost, cost_fname):    
+    np.savez(weight_fname, w1, w2)
+    pd.DataFrame(data=cost).to_csv(cost_fname, header=['mse'], index=None)
+    print('Files Saved!')
     
 #load weight of SNN in numpy format
 def load_w(fname):
-    #completar code
-    # return pd.read_csv(fname, header=None) # this is for 1 weight
+    weights = np.load(fname)
+    w1 = weights['arr_0']
+    # print(weights['arr_0'])
+    w2 = weights['arr_1']
+    # print(weights['arr_1'])
     return(w1,w2)      
 #
