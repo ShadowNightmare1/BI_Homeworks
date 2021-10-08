@@ -1,3 +1,4 @@
 /Config_files
 /Data
-Data.zip
+/__pycache__
+.gitignore

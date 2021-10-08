@@ -8,57 +8,136 @@ import numpy  as np
 METRICS_FILE = 'metrica.csv'
 CFG_SAE_FILE = 'cnf_sae.csv'
 CFG_SOFTMAX_FILE = 'cnf_softmax.csv'
+CODE = 10
+DL_WEIGHT_FILE = 'w_dl.npz'
+COST_FILE = 'costo_softmax.csv'
+EPSILON = 1e-12
+
 
 # Init.weight of the DL
-def iniW(next_nodes, prev_nodes):
-    # Weight init formula
-    r = np.sqrt(6 / (next_nodes + prev_nodes))
-    w = np.random.rand(next_nodes, prev_nodes) * 2 * r - r
+def iniW(prev_nodes, next_nodes):
+
+    # Weight Initialization (Case 2 ppt)
+    r = np.sqrt(6. / (next_nodes + prev_nodes))
+    w = np.random.rand(next_nodes, prev_nodes) * 2. * r - r
     return w
     
 
 # STEP 1: Feed-forward of AE
-def forward_ae(x,w1,w2):	
-    #complete code
-	return(...)
+def forward_ae(x, w1, w2):	
+    
+    # Hidden Layer
+    z1 = np.dot(w1, x)
+    a1 = act_sigmoid(z1)
+
+    # Output Layer
+    z2 = np.dot(w2, a1)
+    a2 = act_sigmoid(z2)
+	
+    return a1, a2
+
+def forward_softmax(x, w):
+    z = w.dot(x)
+    a = softmax(z)
+    return a
+
 #Activation function
 def act_sigmoid(z):
-    return(1/(1+np.exp(-z)))   
+    return(1. / (1. + np.exp(-z))) # It avoids overflow and problems using integers
+    # return(1 / (1 + np.exp(-z)))   
+    # return np.exp(np.fmin(z, 0)) / (1 + np.exp(- np.abs(z))) # to avoid overflow (as far as i seen on stackoverflow this replaces the commented above)
+                                                            # and works for cases when the overflow appeared
+    
+
 # Derivate of the activation funciton
 def deriva_sigmoid(a):
-    return(a*(1-a))
+    return(a * (1. - a))
 
 # STEP 2: Feed-Backward
-def gradW_ae(a,x,w1,w2):    
-    #complete code
-    return(gW1,gW2)    
+def gradW_ae(a1, a2 , x, w1, w2, error):    
+
+    # Backward Pass Output
+    deriv2 = deriva_sigmoid(a2)
+    dZ2 = error * deriv2
+    dW2 = np.dot(dZ2, a1.T)
+
+    # Backward Pass Hidden
+    deriv1 = deriva_sigmoid(a1)
+    err1 = np.dot(w2.T, dZ2)
+    dZ1 = err1 * deriv1
+    dW1 = dZ1.dot(x.T)
+
+    return dW1, dW2
 
 # Update W of the AE
 def updW_ae(w1,w2,gW1,gW2,mu):
-    w1-= mu*gW1
-    w2-= mu*gW2
-    return(w1,w2)
+    w1 -= mu * gW1
+    w2 -= mu * gW2
+    return w1, w2
+
+
+# Up´date W of the Softmax
+def updW_softmax(w, dWs, mu):
+    w = w - mu * dWs
+    return w
 
 # Softmax's gradient
-def grad_softmax(x,y,w,lambW):    
-    #complete code    
-    return(gW,Cost)
+def grad_softmax(x, y, w, lambW, a): 
+    error = y - a 
+    dZs = error.dot(x.T)
+    dWs = - (dZs / y.shape[1]) + np.dot(lambW, w)
+    cost = cross_entropy_ppt(y, a, lambW, w)
+    return dWs, cost
+
+# Cross Entropy Function
+def cross_entropy_stackOverflow(y_real, y_pred, penalty, w):
+    predictions = np.clip(y_pred, EPSILON, 1. - EPSILON)
+    N = y_real.shape[1]
+    ce = - np.sum(y_real * np.log(predictions)) / N
+    # newCe = ce + penalty * (w / w.shape[1])
+    return ce
+
+def cross_entropy_ppt(y_real, y_pred, penalty, w):
+    N = y_real.shape[1]
+    ce = np.multiply(y_real, np.log(y_pred))
+    cost = - (1 / N) * np.sum(np.sum(ce))
+    newCost = cost + (penalty / 2) * np.linalg.norm(w, ord=2)**2
+    return newCost
+
 
 # Calculate Softmax
 def softmax(z):
-    #complete code          
-    return(...)
+   # axis 0  -> columns | axis 1 -> rows
+   # exp_values = np.exp(z - np.max(z, axis=1, keepdims=True)) # this is to prevent overflow
+   exp_values = np.exp(z - np.max(z, axis=0, keepdims=True)) # this is to prevent overflow
+   # probabilities = exp_values / np.sum(exp_values, axis=1, keepdims=True)
+   probabilities = exp_values / np.sum(exp_values, axis=0, keepdims=True)
+   return probabilities
 
 # Métrica
 def metricas(x,y):
-    cm     = confusion_matrix(x,y)
-    #complete code              
-    return(...)
+    cm = confusion_matrix(x,y)
+    pd.DataFrame(cm, columns=[1,2,3,4,5,6,7,8,9,10]).to_csv('confusion.csv', index=None)
+    return 
     
+def mse(error):
+    return np.power(error, 2).mean()
+
 #Confusuon matrix
 def confusion_matrix(x,y):
-    #complete code              
-    return(cm)
+    # print(x.shape)
+    # print(y.shape)
+    confMatrix = np.zeros((x.shape[0], y.shape[0])) # it will give us a 10 x 10 matrix of zeros
+    x_aux = x.T
+    y_aux = y.T
+    whereMaxY = np.where(y_aux == 1)[1] # we get the position of the max value on each row in matrix Y
+                                                # since we know is 1, we get all the index of  the matrix where the value is 1
+    for i in range(len(x_aux)):
+        maxValX = max(x_aux[i])
+        whereMaxX = np.where(x_aux == maxValX)[1] # we get the position of the max value on each row in matrix X
+        confMatrix[whereMaxX, whereMaxY[i]] += 1
+            
+    return confMatrix
 
 #------------------------------------------------------------------------
 #      LOAD-SAVE
@@ -93,13 +172,26 @@ def load_data_csv(fname):
     x   = pd.read_csv(fname, header = None)
     x   = np.array(x)   
     # x = x.to_numpy() # maybe this added the error to our previous work
-    return(x)
+    return x
 
 # save costo of Softmax and weights SAE 
 def save_w_dl(W,Ws,cost):    
-    #complete code
-   
+    np.savez(DL_WEIGHT_FILE, wAE1 = W[0], 
+                             wAE2 = W[1],
+                             wAE3 = W[2],
+                             wSoftMax = Ws)
+    pd.DataFrame(data = cost).to_csv(COST_FILE, header=['mse'],
+                                                index=None)
+    print('Files: {} & {} were created and saved!'.format(DL_WEIGHT_FILE,
+                                                          COST_FILE)) 
+    
+
 #load weight of the DL 
 def load_w_dl():
-    #complete code    
-    return(W)    
+    weights = np.load(DL_WEIGHT_FILE)
+    W = [weights['wAE1'], 
+        weights['wAE2'], 
+        weights['wAE3'], 
+        weights['wSoftMax']] 
+    weights.close()
+    return (W)    
