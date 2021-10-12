@@ -65,7 +65,7 @@ def gradW_ae(a1, a2 , x, w1, w2, error):
     deriv1 = deriva_sigmoid(a1)
     err1 = np.dot(w2.T, dZ2)
     dZ1 = err1 * deriv1
-    dW1 = dZ1.dot(x.T)
+    dW1 = np.dot(dZ1, x.T) 
 
     return dW1, dW2
 
@@ -85,24 +85,27 @@ def updW_softmax(w, dWs, mu):
 def grad_softmax(x, y, w, lambW, a): 
     error = y - a 
     dZs = error.dot(x.T)
-    dWs = - (dZs / y.shape[1]) + np.dot(lambW, w)
-    cost = cross_entropy_ppt(y, a, lambW, w)
+    dWs = - (dZs / y.shape[1]) + (lambW * w) # np.dot(lambW, w)
+    cost = cross_entropy(y, a, lambW, w)
+    # cost = categorical_cross_entropy(y, a)
     return dWs, cost
 
-# Cross Entropy Function
-def cross_entropy_stackOverflow(y_real, y_pred, penalty, w):
-    predictions = np.clip(y_pred, EPSILON, 1. - EPSILON)
-    N = y_real.shape[1]
-    ce = - np.sum(y_real * np.log(predictions)) / N
-    # newCe = ce + penalty * (w / w.shape[1])
-    return ce
 
-def cross_entropy_ppt(y_real, y_pred, penalty, w):
+# Cross Entropy Function
+def cross_entropy(y_real, y_pred, penalty, w):
     N = y_real.shape[1]
     ce = np.multiply(y_real, np.log(y_pred))
-    cost = - (1 / N) * np.sum(np.sum(ce))
+    cost = - (1 / N) * np.sum(ce)
     newCost = cost + (penalty / 2) * np.linalg.norm(w, ord=2)**2
     return newCost
+
+
+def categorical_cross_entropy(y_real, y_pred):
+    y_pred_clipped = np.clip(y_pred, 1e-7, 1 - 1e-7) # to avoid inf
+    correct_confidences = np.sum(y_pred_clipped * y_real, axis=0)
+    negative_log_likelihoods = - np.log(correct_confidences)
+    data_loss = np.mean(negative_log_likelihoods)
+    return data_loss
 
 
 # Calculate Softmax
@@ -116,28 +119,67 @@ def softmax(z):
 
 # Métrica
 def metricas(x,y):
-    cm = confusion_matrix(x,y)
-    pd.DataFrame(cm, columns=[1,2,3,4,5,6,7,8,9,10]).to_csv('confusion.csv', index=None)
+    # cm = confusion_matrix(x,y)
+    cm = confusion_matrix(x, y)
+    col = np.arange(1, cm.shape[0] + 1)
+    col = list(col)
+    diagonal = np.diag(cm)
+    precissionVal = precission(diagonal, cm)
+    recallVal = recall(diagonal, cm)
+    fScoreVal = fscore(precissionVal, recallVal)
+
+    avgFScore = np.sum(fScoreVal) / cm.shape[0]
+    # avgFscore = list(avgFScore)
+    # avgCSVScore = np.zeros((1, cm.shape[0]))
+    # avgCSVScore[0, 0] = avgFScore
+
+    # pd.DataFrame(cm, columns=col).to_csv('confusion.csv', index=None)
+
+    col.extend(['Avg F-Score'])
+
+    newData = list(fScoreVal)
+    newData.extend([avgFScore])
+    newData = np.array(newData)
+    newData = np.expand_dims(newData, axis=0)
+    # print(newData, newData.shape)
+    # print(newData, len(newData))
+    metrica = pd.DataFrame(data=newData, columns=col, index=['F-Score'])
+    # metrica.round(3) # no funca
+    metrica.to_csv(METRICS_FILE)
     return 
+
+def precission(diagonal, cm):
+    denom = np.sum(cm, axis=1)
+    value = diagonal / denom
+    return value
+
+def recall(diagonal, cm):
+    denom = np.sum(cm, axis=0)
+    value = diagonal / denom
+    return value
+
+def fscore(precissionVal, recallVal):
+    num = precissionVal * recallVal
+    denom = precissionVal + recallVal
+    division = num / denom
+    value = 2 * division
+    value = np.nan_to_num(value)
+    return value
     
 def mse(error):
     return np.power(error, 2).mean()
 
 #Confusuon matrix
 def confusion_matrix(x,y):
-    # print(x.shape)
-    # print(y.shape)
-    confMatrix = np.zeros((x.shape[0], y.shape[0])) # it will give us a 10 x 10 matrix of zeros
-    x_aux = x.T
-    y_aux = y.T
-    whereMaxY = np.where(y_aux == 1)[1] # we get the position of the max value on each row in matrix Y
-                                                # since we know is 1, we get all the index of  the matrix where the value is 1
-    for i in range(len(x_aux)):
-        maxValX = max(x_aux[i])
-        whereMaxX = np.where(x_aux == maxValX)[1] # we get the position of the max value on each row in matrix X
-        confMatrix[whereMaxX, whereMaxY[i]] += 1
-            
+    confMatrix = np.zeros((y.shape[0],y.shape[0]))
+    Ymax = np.argmax(y, axis=0)
+    Xmax = np.argmax(x, axis=0)
+    for i in range(len(Ymax)):
+        confMatrix[Xmax[i], Ymax[i]] += 1
+    
     return confMatrix
+
+
 
 #------------------------------------------------------------------------
 #      LOAD-SAVE

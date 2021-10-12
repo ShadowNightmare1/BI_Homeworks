@@ -31,10 +31,10 @@ def train_softmax(x,y,param): # i'm afraid this could be wrong
         
         # Epoch log
         if iter % 10 == 0:
-            print('Epoch {} | MSE: {} | Cross-Entropy Loss: {}'.format(iter, mseVal,loss))
+            print('Epoch {} | MSE: {} | Cross-Entropy Loss: {}'.format(iter, mseVal, loss))
 
-    pd.DataFrame(data=a).to_csv('act_softmax.csv', header=None, index=None)   
-    ut.metricas(a, y)
+    # pd.DataFrame(data=a).to_csv('act_softmax.csv', header=None, index=None)   
+    # ut.metricas(a, y)
     return w, costo
 
 
@@ -93,8 +93,8 @@ def main():
     param_sae, param_sft = ut.load_config()    
     xe = ut.load_data_csv('train_x.csv')
     ye = ut.load_data_csv('train_y.csv')
-    # np.random.shuffle(xe)
-    # np.random.shuffle(ye)
+    np.random.shuffle(xe)
+    np.random.shuffle(ye)
     W, Xr = train_sae(xe,param_sae) 
     Ws, cost = train_softmax(Xr,ye,param_sft)
     ut.save_w_dl(W,Ws,cost)

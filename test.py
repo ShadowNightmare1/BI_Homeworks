@@ -1,8 +1,6 @@
 # Mauricio Abarca J.
 # 19.319.550-4
 
-import pandas as pd
-import numpy as np
 import utilities as ut
 
    
@@ -30,6 +28,7 @@ def main():
 	W  = ut.load_w_dl()
 	zv = forward_dl(xv,W)      		
 	ut.metricas(yv,zv) 
+	print('Metrica File Generated!')
 	
 
 if __name__ == '__main__':   
