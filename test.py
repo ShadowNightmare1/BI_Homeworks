@@ -14,10 +14,10 @@ def forward_dl(x,W):
 
 	# Activations of AE
 	a1, a2 = ut.forward_ae(x, w1, w2)
-	a2, a3 = ut.forward_ae(a1, w2, w3)
+	# a2, a3 = ut.forward_ae(a1, w2, w3)
 
 	# Activation of Softmax
-	aS = ut.forward_softmax(a3, wS)
+	aS = ut.forward_softmax(a2, wS)
 
 	return aS
 

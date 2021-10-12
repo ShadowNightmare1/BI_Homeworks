@@ -194,7 +194,7 @@ def load_config():
     # make this more dynamic later
     hidden_nodes_1 = int(config_sae[0][2])
     hidden_nodes_2 = int(config_sae[0][3])
-    hidden_nodes_3 = int(config_sae[0][4])
+    # hidden_nodes_3 = int(config_sae[0][4])
 
     # SOFTMAX CONFIG
     config_softmax = pd.read_csv(CFG_SOFTMAX_FILE, header=None)
@@ -203,7 +203,7 @@ def load_config():
     lambda_softmax = float(config_softmax[0][2]) # penalty
 
     # RETURNING VALUES
-    params_sae = [sae_max_iter, lr, hidden_nodes_1, hidden_nodes_2, hidden_nodes_3]
+    params_sae = [sae_max_iter, lr, hidden_nodes_1, hidden_nodes_2]# , hidden_nodes_3]
     params_softmax = [sftmx_max_iter, mu, lambda_softmax]
 
     return params_sae, params_softmax
@@ -233,7 +233,7 @@ def load_w_dl():
     weights = np.load(DL_WEIGHT_FILE)
     W = [weights['wAE1'], 
         weights['wAE2'], 
-        weights['wAE3'], 
+        # weights['wAE3'], 
         weights['wSoftMax']] 
     weights.close()
     return (W)    
