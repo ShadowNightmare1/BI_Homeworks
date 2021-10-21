@@ -12,6 +12,8 @@ CODE = 10
 DL_WEIGHT_FILE = 'w_dl.npz'
 COST_FILE = 'costo_softmax.csv'
 EPSILON = 1e-12
+N = 100
+CLASSES = 256
 
 
 # Init.weight of the DL
@@ -23,6 +25,21 @@ def iniW(prev_nodes, next_nodes):
     return w
     
 
+def generator():
+    X = np.zeros((CLASSES, N))
+    Y = np.zeros((CLASSES, N))
+
+    for i in range(CLASSES):
+        for j in range(N):
+            newValX = np.random.uniform(0, 1)
+            newValY = np.random.uniform(0, 1)
+            X[i][j] = newValX
+            Y[i][j] = newValY
+    
+    pd.DataFrame(X).to_csv('gen_test_x.csv', header=None, index=None)
+    pd.DataFrame(Y).to_csv('gen_test_y.csv', header=None, index=None)
+
+    return X, Y
 # STEP 1: Feed-forward of AE
 def forward_ae(x, w1, w2):	
     
@@ -43,15 +60,16 @@ def forward_softmax(x, w):
 
 #Activation function
 def act_sigmoid(z):
-    return(1. / (1. + np.exp(-z))) # It avoids overflow and problems using integers
-    # return(1 / (1 + np.exp(-z)))   
+    # return(1. / (1. + np.exp(-z))) # It avoids overflow and problems using integers
+    return(1 / (1 + np.exp(-z)))   
     # return np.exp(np.fmin(z, 0)) / (1 + np.exp(- np.abs(z))) # to avoid overflow (as far as i seen on stackoverflow this replaces the commented above)
                                                             # and works for cases when the overflow appeared
     
 
 # Derivate of the activation funciton
 def deriva_sigmoid(a):
-    return(a * (1. - a))
+    # return(a * (1. - a))
+    return a * (1 - a)
 
 # STEP 2: Feed-Backward
 def gradW_ae(a1, a2 , x, w1, w2, error):    
@@ -111,29 +129,31 @@ def categorical_cross_entropy(y_real, y_pred):
 # Calculate Softmax
 def softmax(z):
    # axis 0  -> columns | axis 1 -> rows
-   # exp_values = np.exp(z - np.max(z, axis=1, keepdims=True)) # this is to prevent overflow
-   exp_values = np.exp(z - np.max(z, axis=0, keepdims=True)) # this is to prevent overflow
-   # probabilities = exp_values / np.sum(exp_values, axis=1, keepdims=True)
+   exp_values = np.exp(z - np.max(z, axis=0, keepdims=True)) # this is to prevent overflow 
    probabilities = exp_values / np.sum(exp_values, axis=0, keepdims=True)
    return probabilities
 
 # Métrica
-def metricas(x,y):
+def metricas(x,y): # yv, zv # TODO Revisar!
     # cm = confusion_matrix(x,y)
     cm = confusion_matrix(x, y)
+    print(cm)
     col = np.arange(1, cm.shape[0] + 1)
     col = list(col)
     diagonal = np.diag(cm)
+    # print(diagonal)
     precissionVal = precission(diagonal, cm)
     recallVal = recall(diagonal, cm)
     fScoreVal = fscore(precissionVal, recallVal)
+    # print(recallVal)
+    # print(precissionVal)
 
     avgFScore = np.sum(fScoreVal) / cm.shape[0]
     # avgFscore = list(avgFScore)
     # avgCSVScore = np.zeros((1, cm.shape[0]))
     # avgCSVScore[0, 0] = avgFScore
 
-    # pd.DataFrame(cm, columns=col).to_csv('confusion.csv', index=None)
+    pd.DataFrame(cm, columns=col).to_csv('confusion.csv', index=None)
 
     col.extend(['Avg F-Score'])
 
@@ -150,11 +170,13 @@ def metricas(x,y):
 
 def precission(diagonal, cm):
     denom = np.sum(cm, axis=1)
+    # print('prec: {}'.format(denom))
     value = diagonal / denom
     return value
 
 def recall(diagonal, cm):
     denom = np.sum(cm, axis=0)
+    # print('recall: {}'.format(denom))
     value = diagonal / denom
     return value
 
@@ -170,14 +192,13 @@ def mse(error):
     return np.power(error, 2).mean()
 
 #Confusuon matrix
-def confusion_matrix(x,y):
-    confMatrix = np.zeros((y.shape[0],y.shape[0]))
-    Ymax = np.argmax(y, axis=0)
-    Xmax = np.argmax(x, axis=0)
-    for i in range(len(Ymax)):
-        confMatrix[Xmax[i], Ymax[i]] += 1
-    
-    return confMatrix
+def confusion_matrix(x, y): # yv, xv
+    j = np.argmax(x, axis=0)
+    i = np.argmax(y, axis=0)
+    cm = np.zeros((x.shape[0],x.shape[0]))
+    for k in range(x.shape[1]):
+        cm[i[k], j[k]] += 1
+    return cm
 
 
 
@@ -191,11 +212,17 @@ def load_config():
     config_sae = pd.read_csv(CFG_SAE_FILE, header=None)
     sae_max_iter = int(config_sae[0][0])
     lr = float(config_sae[0][1]) # just for ensure float number
+
     # make this more dynamic later
-    hidden_nodes_1 = int(config_sae[0][2])
-    hidden_nodes_2 = int(config_sae[0][3])
+    # hidden_nodes_1 = int(config_sae[0][2])
+    # hidden_nodes_2 = int(config_sae[0][3])
     # hidden_nodes_3 = int(config_sae[0][4])
 
+    # Best approach for now
+    hidden_nodes = list()
+    for i in range(2, len(config_sae)):
+        hidden_nodes.append(int(config_sae[0][i]))
+    
     # SOFTMAX CONFIG
     config_softmax = pd.read_csv(CFG_SOFTMAX_FILE, header=None)
     sftmx_max_iter = int(config_softmax[0][0])
@@ -203,7 +230,8 @@ def load_config():
     lambda_softmax = float(config_softmax[0][2]) # penalty
 
     # RETURNING VALUES
-    params_sae = [sae_max_iter, lr, hidden_nodes_1, hidden_nodes_2]# , hidden_nodes_3]
+    # params_sae = [sae_max_iter, lr, hidden_nodes_1, hidden_nodes_2]# , hidden_nodes_3]
+    params_sae = [sae_max_iter, lr, hidden_nodes]
     params_softmax = [sftmx_max_iter, mu, lambda_softmax]
 
     return params_sae, params_softmax
@@ -218,12 +246,14 @@ def load_data_csv(fname):
 
 # save costo of Softmax and weights SAE 
 def save_w_dl(W,Ws,cost):    
+    # print(len(W))
     np.savez(DL_WEIGHT_FILE, wAE1 = W[0], 
-                             wAE2 = W[1],
-                             wAE3 = W[2],
+                              wAE2 = W[1],
+    #                          wAE3 = W[2],
                              wSoftMax = Ws)
-    pd.DataFrame(data = cost).to_csv(COST_FILE, header=['mse'],
-                                                index=None)
+    pd.DataFrame(data = cost).to_csv(COST_FILE, header=['Softmax Cost'],
+                                                 index=None)
+    
     print('Files: {} & {} were created and saved!'.format(DL_WEIGHT_FILE,
                                                           COST_FILE)) 
     

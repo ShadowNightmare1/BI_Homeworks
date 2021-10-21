@@ -59,7 +59,7 @@ def train_ae(x,hnode,MaxIter,mu):
         w1, w2 = ut.updW_ae(w1, w2, dW1, dW2, mu)
 
         # Epoch Log
-        if iter % 10 == 0:
+        if iter % 100 == 0:
             print('Epoch: {} | MSE: {}'.format(iter, mse))
 
     return w1, a1
@@ -68,21 +68,23 @@ def train_ae(x,hnode,MaxIter,mu):
 #SAE's Training 
 def train_sae(x,param):
     W = list()
+    hidden_nodes_layers = param[-1]
     
-    for hn in range(2,len(param)):
-        print('AE={} Hnode={}'.format(hn - 1,param[hn]))
-        if hn + 1 >= len(param):
+    for hn in range(len(hidden_nodes_layers)):
+        print('AE={} Hnode={}'.format(hn + 1, hidden_nodes_layers[hn]))
+
+        if hn + 1 >= len(hidden_nodes_layers):
             next_hn = ut.CODE
         else:
-            next_hn = param[hn + 1]
+            next_hn = hidden_nodes_layers[hn + 1]
 
-        if hn - 1 == 1:
+        if hn == 0:
             input = x
 
         else:
             input = a
 
-        w1, a = train_ae(input, [param[hn], next_hn], param[0], param[1])
+        w1, a = train_ae(input, [hidden_nodes_layers[hn], next_hn], param[0], param[1])
         W.append(w1)
 
     return W, a                        
@@ -95,6 +97,8 @@ def main():
     ye = ut.load_data_csv('train_y.csv')
     np.random.shuffle(xe)
     np.random.shuffle(ye)
+    
+    # print(param_sae)
     W, Xr = train_sae(xe,param_sae) 
     Ws, cost = train_softmax(Xr,ye,param_sft)
     ut.save_w_dl(W,Ws,cost)
