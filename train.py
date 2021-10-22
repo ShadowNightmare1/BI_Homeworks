@@ -99,8 +99,8 @@ def main():
     np.random.shuffle(ye)
     
     # print(param_sae)
-    W, Xr = train_sae(xe,param_sae) 
-    Ws, cost = train_softmax(Xr,ye,param_sft)
+    W, Xr = train_sae(xe, param_sae) 
+    Ws, cost = train_softmax(Xr, ye, param_sft)
     ut.save_w_dl(W,Ws,cost)
        
 if __name__ == '__main__':   

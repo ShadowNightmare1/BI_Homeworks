@@ -40,6 +40,16 @@ def generator():
     pd.DataFrame(Y).to_csv('gen_test_y.csv', header=None, index=None)
 
     return X, Y
+
+
+def loadTest():
+    z = pd.read_csv('zv.csv', header=None) # predicha
+    y = pd.read_csv('yv.csv', header=None) # deseada
+    z = np.array(z)
+    y = np.array(y)
+    return z, y
+
+
 # STEP 1: Feed-forward of AE
 def forward_ae(x, w1, w2):	
     
@@ -53,15 +63,20 @@ def forward_ae(x, w1, w2):
 	
     return a1, a2
 
+
 def forward_softmax(x, w):
     z = w.dot(x)
     a = softmax(z)
+
+    zv = pd.DataFrame(a)
+    zv.to_csv('test_zv.csv', header=None, index=None)
     return a
+
 
 #Activation function
 def act_sigmoid(z):
-    # return(1. / (1. + np.exp(-z))) # It avoids overflow and problems using integers
-    return(1 / (1 + np.exp(-z)))   
+    return(1. / (1. + np.exp(-z))) # It avoids overflow and problems using integers
+    # return(1 / (1 + np.exp(-z)))   
     # return np.exp(np.fmin(z, 0)) / (1 + np.exp(- np.abs(z))) # to avoid overflow (as far as i seen on stackoverflow this replaces the commented above)
                                                             # and works for cases when the overflow appeared
     
@@ -70,6 +85,7 @@ def act_sigmoid(z):
 def deriva_sigmoid(a):
     # return(a * (1. - a))
     return a * (1 - a)
+
 
 # STEP 2: Feed-Backward
 def gradW_ae(a1, a2 , x, w1, w2, error):    
@@ -87,6 +103,7 @@ def gradW_ae(a1, a2 , x, w1, w2, error):
 
     return dW1, dW2
 
+
 # Update W of the AE
 def updW_ae(w1,w2,gW1,gW2,mu):
     w1 -= mu * gW1
@@ -94,10 +111,11 @@ def updW_ae(w1,w2,gW1,gW2,mu):
     return w1, w2
 
 
-# Up´date W of the Softmax
+# Update W of the Softmax
 def updW_softmax(w, dWs, mu):
     w = w - mu * dWs
     return w
+
 
 # Softmax's gradient
 def grad_softmax(x, y, w, lambW, a): 
@@ -119,8 +137,9 @@ def cross_entropy(y_real, y_pred, penalty, w):
 
 
 def categorical_cross_entropy(y_real, y_pred):
-    y_pred_clipped = np.clip(y_pred, 1e-7, 1 - 1e-7) # to avoid inf
-    correct_confidences = np.sum(y_pred_clipped * y_real, axis=0)
+    # y_pred_clipped = np.clip(y_pred, 1e-7, 1 - 1e-7) # to avoid inf
+    # correct_confidences = np.sum(y_pred_clipped * y_real, axis=0)
+    correct_confidences = np.sum(y_pred * y_real, axis=0)
     negative_log_likelihoods = - np.log(correct_confidences)
     data_loss = np.mean(negative_log_likelihoods)
     return data_loss
@@ -133,70 +152,74 @@ def softmax(z):
    probabilities = exp_values / np.sum(exp_values, axis=0, keepdims=True)
    return probabilities
 
+
 # Métrica
-def metricas(x,y): # yv, zv # TODO Revisar!
-    # cm = confusion_matrix(x,y)
-    cm = confusion_matrix(x, y)
-    print(cm)
+def metricas(y_real, y_pred): # yv, zv # it works (i think)
+    cm = confusion_matrix(y_real, y_pred)
     col = np.arange(1, cm.shape[0] + 1)
     col = list(col)
-    diagonal = np.diag(cm)
-    # print(diagonal)
-    precissionVal = precission(diagonal, cm)
-    recallVal = recall(diagonal, cm)
-    fScoreVal = fscore(precissionVal, recallVal)
-    # print(recallVal)
-    # print(precissionVal)
+    print(cm) # it perfectly works
 
-    avgFScore = np.sum(fScoreVal) / cm.shape[0]
-    # avgFscore = list(avgFScore)
-    # avgCSVScore = np.zeros((1, cm.shape[0]))
-    # avgCSVScore[0, 0] = avgFScore
+    prec = precission(cm)
+    # print(prec) # it seems to work
+   
+    rec = recall(cm)
+    # print(rec)
 
-    pd.DataFrame(cm, columns=col).to_csv('confusion.csv', index=None)
+    fscore = fScore(prec, rec)
+    # print(fscore)
 
+    avgFScore = np.sum(fscore) / cm.shape[0]
+
+    conf_csv = pd.DataFrame(cm, columns=col)
+    conf_csv.to_csv('confusion_matrix.csv', index=None)
+
+    
     col.extend(['Avg F-Score'])
-
-    newData = list(fScoreVal)
+    newData = list(fscore)
     newData.extend([avgFScore])
     newData = np.array(newData)
     newData = np.expand_dims(newData, axis=0)
-    # print(newData, newData.shape)
-    # print(newData, len(newData))
-    metrica = pd.DataFrame(data=newData, columns=col, index=['F-Score'])
-    # metrica.round(3) # no funca
-    metrica.to_csv(METRICS_FILE)
+
+    metrica_csv = pd.DataFrame(newData, columns=col, index=['F-Score'])
+    metrica_csv.to_csv(METRICS_FILE)
+
     return 
 
-def precission(diagonal, cm):
+
+def precission(cm):
+    diagonal = cm.diagonal()
+    print(diagonal)
     denom = np.sum(cm, axis=1)
-    # print('prec: {}'.format(denom))
-    value = diagonal / denom
-    return value
+    print(denom)
+    prec = diagonal / denom
+    return prec
 
-def recall(diagonal, cm):
+
+def recall(cm):
+    diagonal = cm.diagonal()
     denom = np.sum(cm, axis=0)
-    # print('recall: {}'.format(denom))
-    value = diagonal / denom
-    return value
+    rec = diagonal / denom
+    return rec
 
-def fscore(precissionVal, recallVal):
-    num = precissionVal * recallVal
-    denom = precissionVal + recallVal
-    division = num / denom
-    value = 2 * division
-    value = np.nan_to_num(value)
-    return value
-    
+
+def fScore(prec, rec):
+    num = prec * rec
+    denom = prec + rec
+    fscore = 2 * (num / denom)
+    return fscore
+
 def mse(error):
     return np.power(error, 2).mean()
 
-#Confusuon matrix
-def confusion_matrix(x, y): # yv, xv
-    j = np.argmax(x, axis=0)
-    i = np.argmax(y, axis=0)
-    cm = np.zeros((x.shape[0],x.shape[0]))
-    for k in range(x.shape[1]):
+
+#Confusion matrix
+def confusion_matrix(y_real, y_pred): # yv, zv  # Funciona, con los datos del profe (de test) dio la misma matriz
+    cm = np.zeros((y_real.shape[0], y_real.shape[0]))
+    i = np.argmax(y_pred, axis=0)
+    j = np.argmax(y_real, axis=0)
+    
+    for k in range(y_real.shape[1]):
         cm[i[k], j[k]] += 1
     return cm
 
