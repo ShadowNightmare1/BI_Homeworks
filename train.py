@@ -1,82 +1,96 @@
 # Mauricio Abarca J.
 # 19.319.550-4
-# Aim : Deep-Learning: Training via BP+GD
+
+# Training SAE via SGD with Momentum
+
 
 import utilities as ut
 import pandas as pd	
 import numpy as np
 
-
+	
 # Softmax's training
-def train_softmax(x,y,param): # i'm afraid this could be wrong
-    w = ut.iniW(x.shape[0], y.shape[0])
+def train_softmax(x, y, param):
+    W, V = ut.iniWs(x.shape[0], y.shape[0])
     costo = []
-    print('Softmax  | Max iter: {}'.format(param[0]))
+
     for iter in range(param[0]):        
-        # Forward Pass
-        a = ut.forward_softmax(x, w)
+        idx = np.random.permutation(x.shape[1])
+        xe  = x[:, idx]
+        ye = y[:, idx] # nope
+        W, V, cost = softmax_batch(xe, ye, W, V, [ut.SOFTMAX_BATCH_SIZE, param[1]])              
+        costo.append(cost)
 
-        # Calculate Cost
-        # crossEntropy = ut.cross_entropy(y, a, param[2], w)
-        # costo.append(crossEntropy)
-        error = y - a
-        # error = a - y
-        mseVal = ut.mse(error)
-
-        # Backward Pass
-        dWs, loss = ut.grad_softmax(x, y, w, param[2], a)
-        costo.append(loss)
-        w = ut.updW_softmax(w, dWs, param[1])
-
-        
         # Epoch log
-        if iter % 10 == 0:
-            print('Epoch {} | MSE: {} | Cross-Entropy Loss: {}'.format(iter, mseVal, loss))
-
-    # pd.DataFrame(data=a).to_csv('act_softmax.csv', header=None, index=None)   
-    # ut.metricas(a, y)
-    return w, costo
+        if iter % 100 == 0:
+            print('Epoch {} | Cross-Entropy Loss: {}'.format(iter, cost))     
+    return W, costo
 
 
-# AE's Training 
-def train_ae(x,hnode,MaxIter,mu):
-    w1 = ut.iniW(x.shape[0], hnode[0])            
-    w2 = ut.iniW(hnode[0], x.shape[0])
-    # cost = list()
+# Training Softmax miniBatch SGD
+def softmax_batch(x, y, W, V, param):
+    numBatch = np.int16(np.floor(x.shape[1] / param[0]))    
+    
+    for i in range(numBatch):
+        X = ut.get_miniBatch(i, x, param[0])
+        Y = ut.get_miniBatch(i, y, param[0])
 
-    for iter in range(MaxIter):
-        # Forward Pass
-        a1, a2 = ut.forward_ae(x, w1, w2)
-
-        # Calculate Cost
-        error = a2 - x 
-        # error = x - a2
-        mse = ut.mse(error)
-        # cost.append(mse)
+        # Forward Pass Batch
+        A1 = ut.forward_softmax(X, W)
 
         # Backward Pass
-        dW1, dW2 = ut.gradW_ae(a1, a2, x, w1, w2, error)
-        w1, w2 = ut.updW_ae(w1, w2, dW1, dW2, mu)
+        dWs, loss = ut.gradW_softmax(X, Y, A1)
+        W, V = ut.updW_sft_sgd(W, V, dWs, param[1])
+    
 
-        # Epoch Log
-        if iter % 100 == 0:
-            print('Epoch: {} | MSE: {}'.format(iter, mse))
+    return W, V, loss
 
-    return w1, a1
+# Training AE miniBatch SGD
+def train_batch(x, W, V, param):
+    numBatch = np.int16(np.floor(x.shape[1] / param[0]))    
+
+    for i in range(numBatch):                
+        X = ut.get_miniBatch(i, x, param[0])
+        W2 = ut.iniW(W.shape[1], W.shape[0])
+        
+        # Forward Pass Batch
+        A1 = ut.forward_ae(X, W)
+        A2 = ut.forward_ae(A1, W2)
+
+        # Calculate Cost Batch
+        error = A2 - X
+        mse = ut.mse(error)
+
+        # Backward Pass Batch
+        dW1, _ = ut.gradW_ae(A1, A2, X, W2, error)
+        W, V = ut.updW_ae_sgd(W, V, dW1, param[2])
+
+    return W, V, mse
+
+
+#Training AE by use SGD
+def train_ae(x, hn, param):    
+    W, V    = ut.iniWs(x.shape[0], hn)            
+    for Iter in range(1, param[1]):        
+        xe  = x[:, np.random.permutation(x.shape[1])]        
+        W, V, cost = train_batch(xe, W, V, param)
+        A = ut.forward_ae(xe, W)
+
+        if Iter % 10 == 0:
+            print('Epoch: {} | MSE (last batch value): {}'.format(Iter, cost))
+        
+    return W, A
 
 
 #SAE's Training 
-def train_sae(x,param):
+def train_sae(x,param):    
     W = list()
     hidden_nodes_layers = param[-1]
-    
+    batch_size = param[0]
+    max_iter = param[1]
+    lr = param[2]
     for hn in range(len(hidden_nodes_layers)):
         print('AE={} Hnode={}'.format(hn + 1, hidden_nodes_layers[hn]))
-
-        if hn + 1 >= len(hidden_nodes_layers):
-            next_hn = ut.CODE
-        else:
-            next_hn = hidden_nodes_layers[hn + 1]
 
         if hn == 0:
             input = x
@@ -84,24 +98,21 @@ def train_sae(x,param):
         else:
             input = a
 
-        w1, a = train_ae(input, [hidden_nodes_layers[hn], next_hn], param[0], param[1])
+        w1, a = train_ae(input, hidden_nodes_layers[hn], [batch_size, max_iter, lr])
         W.append(w1)
 
-    return W, a                        
-    
-   
+    return W, a
+
+
 # Beginning ...
 def main():
-    param_sae, param_sft = ut.load_config()    
-    xe = ut.load_data_csv('train_x.csv')
-    ye = ut.load_data_csv('train_y.csv')
-    np.random.shuffle(xe)
-    np.random.shuffle(ye)
-    
-    # print(param_sae)
-    W, Xr = train_sae(xe,param_sae) 
-    Ws, cost = train_softmax(Xr,ye,param_sft)
-    ut.save_w_dl(W,Ws,cost)
+    p_sae, p_sft = ut.load_config()    
+    xe          = ut.load_data_csv('train_x.csv')
+    ye          = ut.load_data_csv('train_y.csv')
+    W, Xr       = train_sae(xe, p_sae)     
+    Ws, cost    = train_softmax(Xr, ye, p_sft)
+    ut.save_w_dl(W, Ws, cost)
        
+
 if __name__ == '__main__':   
 	 main()
