@@ -1,118 +1,117 @@
 # Mauricio Abarca J.
 # 19.319.550-4
 
-# Training SAE via SGD with Momentum
-
+#Training SAE via RMSprop+Pseudo-inversa
 
 import utilities as ut
 import pandas as pd	
 import numpy as np
 
-	
-# Softmax's training
-def train_softmax(x, y, param):
-    W, V = ut.iniWs(x.shape[0], y.shape[0])
-    costo = []
 
-    for iter in range(param[0]):        
-        idx = np.random.permutation(x.shape[1])
-        xe  = x[:, idx]
-        ye = y[:, idx] # nope
-        W, V, cost = softmax_batch(xe, ye, W, V, [ut.SOFTMAX_BATCH_SIZE, param[1]])              
-        costo.append(cost)
-
-        # Epoch log
-        if iter % 100 == 0:
-            print('Epoch {} | Cross-Entropy Loss: {}'.format(iter, cost))     
-    return W, costo
+# Minibatch Function
+def get_miniBatch(i, x, bsize):
+    z = x[:, i * bsize : ( i + 1) * bsize]
+    return z
 
 
-# Training Softmax miniBatch SGD
-def softmax_batch(x, y, W, V, param):
-    numBatch = np.int16(np.floor(x.shape[1] / param[0]))    
-    
-    for i in range(numBatch):
-        X = ut.get_miniBatch(i, x, param[0])
-        Y = ut.get_miniBatch(i, y, param[0])
+# Random Permutation / Reordering
+def reordena_rand(x, y):
+    idx = np.random.permutation(x.shape[1])
+    new_x = x[:, idx]
+    new_y = y[:, idx]
+    return new_x, new_y
 
-        # Forward Pass Batch
-        A1 = ut.forward_softmax(X, W)
 
-        # Backward Pass
-        dWs, loss = ut.gradW_softmax(X, Y, A1)
-        W, V = ut.updW_sft_sgd(W, V, dWs, param[1])
-    
+# Training miniBatch for softmax
+def train_sft_batch(x, y, W, V, numBatch, BatchSize, mu):
+    costo = []    
+    for i in range(numBatch):   
+        xe, ye = get_miniBatch(...)        
+        #complete code...        
+    return W, V, costo
 
-    return W, V, loss
 
-# Training AE miniBatch SGD
-def train_batch(x, W, V, param):
-    numBatch = np.int16(np.floor(x.shape[1] / param[0]))    
+# Softmax's training via RMSprop
+def train_softmax(x, y, par1, par2):
+    W, V        = ut.ini_WV(y.shape[0], x.shape[0])    
+    numBatch   = np.int16(np.floor(x.shape[1] / par2[0]))    
+    Costo = []
+    for Iter in range(1, par1[0]):                
+        xe, ye = reordena_rand(x, y)         
+        W, V, c = train_sft_batch(xe, ye, W, V, numBatch, par2[0], par1[1])        
+        Costo.append(np.mean(c))         
+    return W, Costo
 
+ 
+# AE's Training with miniBatch
+def train_ae_batch(x, w1, v, w2, param):
+    numBatch = np.int16(np.floor(x.shape[1] / param[1]))    
+    cost= [] 
     for i in range(numBatch):                
-        X = ut.get_miniBatch(i, x, param[0])
-        W2 = ut.iniW(W.shape[1], W.shape[0])
+        X    = get_miniBatch(i, x, param[1])
         
-        # Forward Pass Batch
-        A1 = ut.forward_ae(X, W)
-        A2 = ut.forward_ae(A1, W2)
+        # Forward Pass batch
+        A1 = ut.forward_ae(X, w1)
+        A2 = ut.forward_ae(A1, w2)
 
-        # Calculate Cost Batch
+        # Calculate MSE
         error = A2 - X
         mse = ut.mse(error)
 
         # Backward Pass Batch
-        dW1, _ = ut.gradW_ae(A1, A2, X, W2, error)
-        W, V = ut.updW_ae_sgd(W, V, dW1, param[2])
+        w2 = ut.pinv_ae(X, w1, param[0])
+        dW1, costo = ut.gradW1(A1, w2)
+        cost.append(costo)
 
-    return W, V, mse
+        w1, v = ut.updW1_rmsprop(w, v, dW1, param[3])
+        
+    return w1, v, cost
 
 
-#Training AE by use SGD
-def train_ae(x, hn, param):    
-    W, V    = ut.iniWs(x.shape[0], hn)            
+# AE's Training by use miniBatch RMSprop+Pinv
+def train_ae(x, hn, param):        
+    w1, v = ut.ini_WV(param[hn], x.shape[0])            
+    w2   = ut.pinv_ae(x, w1, param[3]) # que hace y como funciona ?
+    cost = []
     for Iter in range(1, param[1]):        
-        xe  = x[:, np.random.permutation(x.shape[1])]        
-        W, V, cost = train_batch(xe, W, V, param)
-        A = ut.forward_ae(xe, W)
+        xe     = x[:, np.random.permutation(x.shape[1])]                
+        w1, v, c = train_ae_batch(xe, w1, v, w2, param)                  
+        cost.append(np.mean(c))                
 
         if Iter % 10 == 0:
-            print('Epoch: {} | MSE (last batch value): {}'.format(Iter, cost))
-        
-    return W, A
+            print('Epoch: {} | MSE (mean of the batch): {}'.format(Iter, np.mean(c)))
+    return w2.T 
 
 
 #SAE's Training 
-def train_sae(x,param):    
-    W = list()
-    hidden_nodes_layers = param[-1]
-    batch_size = param[0]
-    max_iter = param[1]
-    lr = param[2]
-    for hn in range(len(hidden_nodes_layers)):
-        print('AE={} Hnode={}'.format(hn + 1, hidden_nodes_layers[hn]))
+def train_sae(x, param):
+    # param: 0 -> penalty 
+    #        1 -> batch size
+    #        2 -> max iter
+    #        3 -> learning rate
+    #        4: -> hidden nodes by layer
+
+    W = {} # Diccionario?
+
+    for hn in range(len(param[4])):
+        print('AE={} Hnode={}'.format(hn + 1, param[4][hn]))
 
         if hn == 0:
             input = x
-
+        
         else:
             input = a
-
-        w1, a = train_ae(input, hidden_nodes_layers[hn], [batch_size, max_iter, lr])
-        W.append(w1)
-
-    return W, a
+        w2, a = train_ae(input, hn, param)  
+    return W, x 
 
 
 # Beginning ...
 def main():
     p_sae, p_sft = ut.load_config()    
-    xe          = ut.load_data_csv('train_x.csv')
-    ye          = ut.load_data_csv('train_y.csv')
-    W, Xr       = train_sae(xe, p_sae)     
-    Ws, cost    = train_softmax(Xr, ye, p_sft)
-    ut.save_w_dl(W, Ws, cost)
+    x, y         = ut.load_data_csv('train.csv')    
+    W, Xr        = train_sae(x, p_sae)         
+    # Ws, cost    = train_softmax(Xr, y, p_sft, p_sae)
+    # ut.save_w_dl(W, Ws, cost)
        
-
 if __name__ == '__main__':   
 	 main()

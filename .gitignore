@@ -4,10 +4,8 @@
 .gitignore
 tarea2_mabarca.zip
 /tarea2_mabarca
-test_x.csv
-test_y.csv
-train_x.csv
-train_y.csv
+train.csv
+test.csv
 /Config
 /tarea2a
 /tarea2b
